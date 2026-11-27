@@ -95,7 +95,6 @@ tun:
   route-exclude-address:
     - 192.168.0.0/16
     - 172.16.0.0/12
-    - 172.32.0.0/12
     - 10.0.0.0/8
     - 100.64.0.0/10
 
@@ -151,11 +150,6 @@ dns:
       - https://8.8.8.8/dns-query#Proxy&disable-qtype-65=true
   nameserver:
     - https://8.8.8.8/dns-query#Proxy&ecs=223.5.5.0/24
-  fallback:
-    - https://8.8.8.8/dns-query#Proxy
-  fallback-filter:
-    geoip: true
-    geoip-code: CN
   fake-ip-filter:
     - rule-set:fakeipfilter_cn
     - rule-set:fakeipfilter_!cn
@@ -178,7 +172,7 @@ proxy-groups:
   - name: Auto
     type: fallback
     url: https://www.gstatic.com/generate_204
-    interval: 180
+    interval: 300
     lazy: true
     timeout: 3000
     proxies:
@@ -194,7 +188,6 @@ rules:
   - DOMAIN-KEYWORD,gh-proxy,Direct
   - DOMAIN-SUFFIX,gh-proxy.com,Direct
 
-  - IP-CIDR,172.32.0.0/12,Direct,no-resolve
   - RULE-SET,private_ip,Direct,no-resolve
   - RULE-SET,private_domain,Direct
 
@@ -202,6 +195,8 @@ rules:
   - IP-CIDR6,::/0,REJECT,no-resolve
 
   - RULE-SET,custom_direct,Direct
+  # drop non-CN QUIC (UDP 443) for HTTP/2 fallback
+  - AND,((NETWORK,udp),(DST-PORT,443),(NOT,((RULE-SET,cn_domain)))),REJECT
   - RULE-SET,custom_proxy,Proxy
 
   - RULE-SET,ai_domain,Proxy
@@ -223,10 +218,11 @@ rules:
   - RULE-SET,steamcn_domain,Direct
   - RULE-SET,steam_domain,Proxy
   - RULE-SET,cn!_domain,Proxy
-  - RULE-SET,google_ip,Proxy
-  - RULE-SET,apple_ip,Proxy
-  - RULE-SET,telegram_ip,Proxy
-  - RULE-SET,netflix_ip,Proxy
+  - RULE-SET,cn_domain,Direct
+  - RULE-SET,google_ip,Proxy,no-resolve
+  - RULE-SET,apple_ip,Proxy,no-resolve
+  - RULE-SET,telegram_ip,Proxy,no-resolve
+  - RULE-SET,netflix_ip,Proxy,no-resolve
   - RULE-SET,cn_ip,Direct
 
   - MATCH,Proxy

@@ -1,4 +1,5 @@
 dist/
+html/
 *.local.json
 *.local.yaml
 proxy_providers/

@@ -29,10 +29,6 @@
             "<reality-short-id>"
           ]
         }
-      },
-      "multiplex": {
-        "enabled": true,
-        "padding": true
       }
     },
     {
