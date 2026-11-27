@@ -7,8 +7,8 @@ Replaces required <placeholder> markers and applies optional client overlays
 (Headscale, AdBlock, external proxy-providers, GitHub ruleset mirror prefix)
 in a single pass. Outputs rendered configs to dist/ by default (gitignored),
 leaving tracked templates untouched. When rendering client templates to an
-output directory, also writes `<output>/url` with one rendered client filename
-per line.
+output directory, also writes `<output>/client/url` with one rendered client
+filename per line.
 
 Usage:
     python scripts/config-batch.py --preview
@@ -756,7 +756,7 @@ def main():
     print(f"Loaded config: {os.path.abspath(loaded)}")
 
     rendered = {}
-    client_files = []
+    client_files_by_dir = {}
     out_base = os.path.abspath(args.output)
     for src_path in sorted(jobs):
         kind, content = jobs[src_path]
@@ -771,10 +771,11 @@ def main():
         dst_path = resolve_output_path(src_path, repo_root, out_base, args.in_place)
         rendered[dst_path] = text
         if kind in ("client_yaml", "client_nodes"):
-            client_files.append(os.path.basename(dst_path))
+            client_files_by_dir.setdefault(os.path.dirname(dst_path), []).append(os.path.basename(dst_path))
 
-    if not args.in_place and client_files:
-        rendered[os.path.join(out_base, "url")] = render_client_url_list(client_files)
+    if not args.in_place:
+        for client_dir, names in sorted(client_files_by_dir.items()):
+            rendered[os.path.join(client_dir, "url")] = render_client_url_list(names)
 
     active = []
     if need_client:

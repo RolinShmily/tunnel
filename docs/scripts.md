@@ -20,7 +20,7 @@
 
 ### 核心行为
 
-- **产物清单**：渲染包含客户端文件且非 `--in-place` 时，自动生成 `dist/url`（无扩展名，每行一个已渲染的客户端文件名）。
+- **产物清单**：渲染包含客户端文件且非 `--in-place` 时，自动生成 `dist/client/url`（无扩展名，每行一个已渲染的客户端文件名）。
 - **Tailscale 出站字段**：`TailscaleControlUrl` / `TailscaleAuthKey` / `TailscaleHostname` 等仅作用于 `client/mihomo-clash-tailscale*.yaml`；`TailscaleControlUrl` 或 `TailscaleAuthKey` 留空 `""` 时自动删除对应字段（分别回退官方 Tailscale 控制面 / 日志交互登录）。
 - **客户端可选叠加层（幂等）**：
   - **Headscale**（`HeadscaleServer`、`HeadscaleMagicDnsDomain`）：注入控制面 DNS/FakeIP 绕过与直连规则；MagicDNS 根据目标模板是否含 `type: tailscale` 自动指向 `100.100.100.100`（`Direct`）或 `100.100.100.100#Tailscale`（`Tailscale`）。
