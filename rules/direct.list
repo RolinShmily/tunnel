@@ -12,3 +12,11 @@
 
 DOMAIN-SUFFIX,local
 IP-CIDR,172.32.0.0/12,no-resolve
+
+# Steam CN CDN & CM direct fix
+DOMAIN,steamcdn-a.akamaihd.net
+DOMAIN-SUFFIX,cm.steampowered.com
+DOMAIN-SUFFIX,steamserver.net
+
+# Google Play CN download CDN fix
+DOMAIN,services.googleapis.cn

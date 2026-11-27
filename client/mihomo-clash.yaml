@@ -106,11 +106,13 @@ sniffer:
         - 8443
   skip-domain:
     - Mijia Cloud
+    - dlg.io.mi.com
     - +.push.apple.com
 
 dns:
   enable: true
   cache-algorithm: arc
+  prefer-h3: true
   ipv6: true
   enhanced-mode: fake-ip
   fake-ip-ttl: 1
@@ -139,6 +141,7 @@ dns:
   nameserver:
     - https://8.8.8.8/dns-query#Proxy&ecs=223.5.5.0/24
   fake-ip-filter:
+    - rule-set:tailscale
     - rule-set:fakeipfilter_cn
     - rule-set:fakeipfilter_!cn
     - rule-set:private_domain
