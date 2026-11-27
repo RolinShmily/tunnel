@@ -1,0 +1,11 @@
+dist/
+*.local.json
+*.local.yaml
+proxy_providers/
+*.tmp-*
+*.bak-*
+.claude/
+__pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db

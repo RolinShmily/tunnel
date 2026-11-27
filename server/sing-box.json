@@ -1,0 +1,91 @@
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "inbounds": [
+    {
+      "tag": "vless-vision-reality-in",
+      "type": "vless",
+      "listen": "::",
+      "listen_port": 443,
+      "users": [
+        {
+          "uuid": "<uuid>",
+          "flow": "xtls-rprx-vision"
+        }
+      ],
+      "tls": {
+        "enabled": true,
+        "server_name": "<reality-sni>",
+        "reality": {
+          "enabled": true,
+          "handshake": {
+            "server": "<reality-host>",
+            "server_port": 443
+          },
+          "private_key": "<reality-private-key>",
+          "short_id": [
+            "<reality-short-id>"
+          ]
+        }
+      },
+      "multiplex": {
+        "enabled": true,
+        "padding": true
+      }
+    },
+    {
+      "tag": "hysteria-in",
+      "type": "hysteria2",
+      "listen": "::",
+      "listen_port": 27015,
+      "users": [
+        {
+          "password": "<hy2-password>"
+        }
+      ],
+      "tls": {
+        "enabled": true,
+        "server_name": "<hy2-sni>",
+        "certificate_path": "<cert-path>",
+        "key_path": "<key-path>"
+      }
+    },
+    {
+      "tag": "vless-ws-in",
+      "type": "vless",
+      "listen": "::",
+      "listen_port": 8443,
+      "users": [
+        {
+          "uuid": "<ws-uuid>"
+        }
+      ],
+      "tls": {
+        "enabled": true,
+        "server_name": "<ws-sni>",
+        "certificate_path": "<ws-cert-path>",
+        "key_path": "<ws-key-path>"
+      },
+      "transport": {
+        "type": "ws",
+        "path": "<ws-path>",
+        "headers": {
+          "Host": "<ws-sni>"
+        },
+        "max_early_data": 2048,
+        "early_data_header_name": "Sec-WebSocket-Protocol"
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "direct",
+      "type": "direct"
+    }
+  ],
+  "route": {
+    "final": "direct"
+  }
+}

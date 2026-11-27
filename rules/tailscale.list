@@ -1,0 +1,9 @@
+PROCESS-NAME,tailscaled.exe
+PROCESS-NAME,tailscaled
+DOMAIN-SUFFIX,tailscale.com
+DOMAIN-SUFFIX,tailscale.io
+DOMAIN-SUFFIX,ts.net
+IP-CIDR,100.64.0.0/10,no-resolve
+IP-CIDR6,fd7a:115c:a1e0::/48,no-resolve
+DST-PORT,3478
+DST-PORT,41641

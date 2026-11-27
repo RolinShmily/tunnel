@@ -1,0 +1,14 @@
+# Custom proxy rules (Mihomo classical / text; omit target policy)
+# Keep at least one active entry to avoid empty-ruleset errors.
+#
+# Examples:
+#   DOMAIN,exact.example.com
+#   DOMAIN-SUFFIX,example.com
+#   DOMAIN-KEYWORD,openai
+#   IP-CIDR,1.1.1.1/32,no-resolve
+#   IP-CIDR6,2606:4700:4700::1111/128,no-resolve
+#   PROCESS-NAME,app.exe
+#   DST-PORT,8443
+
+DOMAIN-SUFFIX,dns.google
+DOMAIN-SUFFIX,cloudflare-dns.com

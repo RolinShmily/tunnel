@@ -1,0 +1,13 @@
+# Custom direct rules (Mihomo classical / text; omit target policy)
+# Keep at least one active entry to avoid empty-ruleset errors.
+#
+# Examples:
+#   DOMAIN,exact.example.com
+#   DOMAIN-SUFFIX,example.com
+#   DOMAIN-KEYWORD,internal
+#   IP-CIDR,192.168.10.0/24,no-resolve
+#   IP-CIDR6,fd00::/8,no-resolve
+#   PROCESS-NAME,app.exe
+#   DST-PORT,8080
+
+DOMAIN-SUFFIX,local
