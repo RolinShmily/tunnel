@@ -1,5 +1,7 @@
 PROCESS-NAME,tailscaled.exe
 PROCESS-NAME,tailscaled
+PROCESS-NAME,tailscale.exe
+PROCESS-NAME,tailscale
 DOMAIN-SUFFIX,tailscale.com
 DOMAIN-SUFFIX,tailscale.io
 DOMAIN-SUFFIX,ts.net

@@ -183,17 +183,18 @@ proxy-groups:
       - Direct
 
 rules:
-  - RULE-SET,tailscale,Direct
-
   # direct mirror to avoid cold-start deadlock
   - DOMAIN-KEYWORD,gh-proxy,Direct
   - DOMAIN-SUFFIX,gh-proxy.com,Direct
 
   - RULE-SET,private_ip,Direct,no-resolve
   - RULE-SET,private_domain,Direct
+  - IP-CIDR6,fd7a:115c:a1e0::/48,Direct,no-resolve
 
   # reject public IPv6 for IPv4-only fallback
   - IP-CIDR6,::/0,REJECT,no-resolve
+
+  - RULE-SET,tailscale,Direct
 
   - RULE-SET,custom_direct,Direct
   # drop non-CN QUIC (UDP 443) for HTTP/2 fallback
