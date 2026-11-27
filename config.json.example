@@ -1,5 +1,5 @@
 {
-  "config-batch": {
+  "reality": {
     "NodeAddress": "<node-address>",
     "RealityPort": 443,
     "Uuid": "<uuid>",
@@ -8,12 +8,16 @@
     "RealityPrivateKey": "<reality-private-key>",
     "ShortId": "<reality-short-id>",
     "HandshakeHost": "<reality-host>",
-    "HandshakePort": 443,
+    "HandshakePort": 443
+  },
+  "hysteria2": {
     "Hy2Port": 27015,
     "Hy2Sni": "<hy2-sni>",
     "Hy2Password": "<hy2-password>",
     "CertificatePath": "<cert-path>",
-    "KeyPath": "<key-path>",
+    "KeyPath": "<key-path>"
+  },
+  "ws": {
     "WsOptimizedDomain": "<cf-domain>",
     "WsPort": 8443,
     "WsSni": "<ws-sni>",
@@ -22,21 +26,23 @@
     "WsCertificatePath": "<ws-cert-path>",
     "WsKeyPath": "<ws-key-path>",
     "WsMaxEarlyData": 2048,
-    "WsEarlyDataHeader": "Sec-WebSocket-Protocol",
+    "WsEarlyDataHeader": "Sec-WebSocket-Protocol"
+  },
+  "client": {
     "MihomoApiSecret": "<api-secret>",
+    "RuleSetProxy": "https://gh-proxy.com/",
+    "EnableAdBlock": false,
+    "AdBlockRuleUrl": "https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.mrs",
+    "EnableExternalSubscribes": false,
+    "ExternalSubscribes": []
+  },
+  "tailscale": {
+    "HeadscaleServer": "",
+    "HeadscaleMagicDnsDomain": "",
     "TailscaleControlUrl": "",
     "TailscaleAuthKey": "",
     "TailscaleHostname": "mihomo",
     "TailscaleEphemeral": false,
     "TailscaleAcceptRoutes": true
-  },
-  "feature-generate": {
-    "HeadscaleServer": "",
-    "HeadscaleMagicDnsDomain": "",
-    "EnableAdBlock": false,
-    "AdBlockRuleUrl": "https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.mrs",
-    "ExternalSubscribes": [],
-    "EnableExternalSubscribes": false,
-    "RuleSetProxy": "https://gh-proxy.com/"
   }
 }
