@@ -4,7 +4,8 @@
 Apply optional feature overlays to Mihomo client YAML configs (idempotent).
 
 Supported overlays:
-  - Headscale control-plane & MagicDNS rules (DNS policy, fake-ip-filter, direct rules)
+  - Headscale control-plane & MagicDNS rules (DNS policy, fake-ip-filter, routing rules)
+  - Optional AdBlock rule-provider (`RULE-SET,adblock,REJECT`)
   - External proxy-providers subscriptions (injected into Proxy group)
   - Ruleset & dashboard download mirror prefix (RuleSetProxy)
 
@@ -29,6 +30,10 @@ FEATURES = {
     # Headscale (leave empty to remove/skip)
     "HeadscaleServer": "",
     "HeadscaleMagicDnsDomain": "",
+
+    # Optional AdBlock ruleset (direct REJECT, no extra proxy-group)
+    "EnableAdBlock": False,
+    "AdBlockRuleUrl": "https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.mrs",
 
     # External subscriptions (proxy-providers)
     "ExternalSubscribes": [],
@@ -81,6 +86,11 @@ def assert_features(values):
     if not isinstance(subs, list):
         raise ValueError("ExternalSubscribes must be a list of URLs; aborted.")
 
+    if bool(values.get("EnableAdBlock", False)):
+        ad_url = str(values.get("AdBlockRuleUrl", "")).strip()
+        if not re.fullmatch(r"https?://[^\s]+", ad_url):
+            raise ValueError("AdBlockRuleUrl must be a valid http(s) URL when EnableAdBlock is true; aborted.")
+
 
 def resolve_ruleset_prefix():
     raw = str(FEATURES.get("RuleSetProxy", "")).strip()
@@ -93,11 +103,22 @@ def normalize_url(url):
     return text[cut:] if cut > 0 else text
 
 
+def is_github_url(url):
+    return bool(re.match(r"^https?://(?:[^/]+\.)?(?:github\.com|githubusercontent\.com)/", url, re.IGNORECASE))
+
+
+def apply_mirror_prefix(url, prefix):
+    clean = normalize_url(url.strip())
+    if prefix and is_github_url(clean):
+        return prefix + clean
+    return clean
+
+
 def apply_ruleset_proxy(text):
     prefix = resolve_ruleset_prefix()
     text = re.sub(
         r'(?m)^(\s*external-ui-url:\s*["\']?)([^"\'\r\n]+)(["\']?)',
-        lambda m: f"{m.group(1)}{prefix}{normalize_url(m.group(2).strip())}{m.group(3)}",
+        lambda m: f"{m.group(1)}{apply_mirror_prefix(m.group(2), prefix)}{m.group(3)}",
         text,
     )
     start = re.search(r'(?m)^rule-providers:[ \t]*\r?$', text)
@@ -108,10 +129,14 @@ def apply_ruleset_proxy(text):
     section_end = start.end() + (stop.start() if stop else len(tail))
     section = re.sub(
         r'(?m)^(\s+url: )([^\r\n]+)',
-        lambda m: m.group(1) + prefix + normalize_url(m.group(2).strip()),
+        lambda m: m.group(1) + apply_mirror_prefix(m.group(2), prefix),
         text[start.end():section_end],
     )
     return text[:start.end()] + section + text[section_end:]
+
+
+def has_tailscale_outbound(text):
+    return bool(re.search(r'(?m)^    type:[ \t]*tailscale[ \t]*\r?$', text))
 
 
 def apply_headscale(text):
@@ -127,6 +152,10 @@ def apply_headscale(text):
     if not hs_server and not hs_domain:
         return text
 
+    ts_outbound = has_tailscale_outbound(text)
+    magic_dns_server = "100.100.100.100#Tailscale" if ts_outbound else "100.100.100.100"
+    magic_dns_target = "Tailscale" if ts_outbound else "Direct"
+
     policy_lines = ["    # headscale:start"]
     if hs_server:
         policy_lines.extend([
@@ -137,7 +166,7 @@ def apply_headscale(text):
     if hs_domain:
         policy_lines.extend([
             f"    '+.{hs_domain}':",
-            "      - 100.100.100.100",
+            f"      - {magic_dns_server}",
         ])
     policy_lines.append("    # headscale:end")
     text = re.sub(
@@ -164,11 +193,67 @@ def apply_headscale(text):
     if hs_server:
         rule_lines.append(f"  - DOMAIN-SUFFIX,{hs_server},Direct")
     if hs_domain:
-        rule_lines.append(f"  - DOMAIN-SUFFIX,{hs_domain},Direct")
+        rule_lines.append(f"  - DOMAIN-SUFFIX,{hs_domain},{magic_dns_target}")
     rule_lines.append("  # headscale:end")
     text = re.sub(
         r'(?m)^(rules:[ \t]*\r?\n)',
         lambda m: m.group(1) + "\n".join(rule_lines) + "\n",
+        text,
+        count=1,
+    )
+    return text
+
+
+def infer_ruleset_format(url):
+    path = re.split(r"[?#]", url, maxsplit=1)[0].lower()
+    if path.endswith(".mrs"):
+        return "mrs"
+    if path.endswith((".yaml", ".yml")):
+        return "yaml"
+    return "text"
+
+
+def apply_adblock(text):
+    # Strip any previously injected adblock blocks first for idempotency.
+    text = re.sub(r'(?ms)^[ \t]*# adblock:start\r?\n.*?^[ \t]*# adblock:end\r?\n', "", text)
+
+    if not bool(FEATURES.get("EnableAdBlock", False)):
+        return text
+
+    url = normalize_url(str(FEATURES.get("AdBlockRuleUrl", "")).strip())
+    if not url or is_placeholder(url):
+        return text
+
+    fmt = infer_ruleset_format(url)
+    rule_block = "  # adblock:start\n  - RULE-SET,adblock,REJECT\n  # adblock:end\n"
+    if re.search(r'(?m)^  - RULE-SET,custom_proxy,', text):
+        text = re.sub(
+            r'(?m)^(  - RULE-SET,custom_proxy,)',
+            lambda m: rule_block + m.group(1),
+            text,
+            count=1,
+        )
+    else:
+        text = re.sub(
+            r'(?m)^(rules:[ \t]*\r?\n)',
+            lambda m: m.group(1) + rule_block,
+            text,
+            count=1,
+        )
+
+    provider_lines = [
+        "  # adblock:start",
+        "  adblock:",
+        "    type: http",
+        "    interval: 86400",
+        "    behavior: domain",
+        f"    format: {fmt}",
+        f"    url: {url}",
+        "  # adblock:end",
+    ]
+    text = re.sub(
+        r'(?m)^(rule-providers:[ \t]*\r?\n)',
+        lambda m: m.group(1) + "\n".join(provider_lines) + "\n",
         text,
         count=1,
     )
@@ -294,6 +379,7 @@ def main():
         if not re.search(r'(?m)^proxies:[ \t]*\r?$', content):
             continue
         text = apply_headscale(content)
+        text = apply_adblock(text)
         text = apply_proxy_providers(
             text,
             FEATURES.get("ExternalSubscribes", []),
@@ -309,6 +395,8 @@ def main():
     active = []
     if str(FEATURES.get("HeadscaleServer", "")).strip() or str(FEATURES.get("HeadscaleMagicDnsDomain", "")).strip():
         active.append("headscale")
+    if FEATURES.get("EnableAdBlock"):
+        active.append("adblock")
     if FEATURES.get("EnableExternalSubscribes") and FEATURES.get("ExternalSubscribes"):
         active.append("proxy-providers")
     active.append(f"ruleset-proxy={resolve_ruleset_prefix() or '(direct)'}")

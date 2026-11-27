@@ -23,11 +23,18 @@
     "WsKeyPath": "<ws-key-path>",
     "WsMaxEarlyData": 2048,
     "WsEarlyDataHeader": "Sec-WebSocket-Protocol",
-    "MihomoApiSecret": "<api-secret>"
+    "MihomoApiSecret": "<api-secret>",
+    "TailscaleControlUrl": "",
+    "TailscaleAuthKey": "",
+    "TailscaleHostname": "mihomo",
+    "TailscaleEphemeral": false,
+    "TailscaleAcceptRoutes": true
   },
   "feature-generate": {
     "HeadscaleServer": "",
     "HeadscaleMagicDnsDomain": "",
+    "EnableAdBlock": false,
+    "AdBlockRuleUrl": "https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.mrs",
     "ExternalSubscribes": [],
     "EnableExternalSubscribes": false,
     "RuleSetProxy": "https://gh-proxy.com/"

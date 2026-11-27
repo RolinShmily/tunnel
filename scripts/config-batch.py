@@ -61,6 +61,13 @@ CONFIG = {
 
     # Client API
     "MihomoApiSecret": "<api-secret>",
+
+    # Tailscale outbound (used by client/mihomo-clash-tailscale*.yaml)
+    "TailscaleControlUrl": "",
+    "TailscaleAuthKey": "",
+    "TailscaleHostname": "mihomo",
+    "TailscaleEphemeral": False,
+    "TailscaleAcceptRoutes": True,
 }
 
 CLIENT_REQUIRED = {
@@ -162,8 +169,26 @@ def assert_values(values, need_client, need_server):
             if re.search(r"[\r\n]", val) or len(val) < 16:
                 raise ValueError(f"{key} must be at least 16 chars with no newlines; aborted.")
 
+    if need_client:
+        ts_url = str(values.get("TailscaleControlUrl", "")).strip()
+        if ts_url:
+            if is_placeholder(ts_url) or not re.fullmatch(r"https?://[^\s]+", ts_url):
+                raise ValueError("TailscaleControlUrl must be empty or a valid http(s) URL; aborted.")
+        ts_key = str(values.get("TailscaleAuthKey", "")).strip()
+        if ts_key:
+            if is_placeholder(ts_key) or re.search(r"[\r\n]", ts_key):
+                raise ValueError("TailscaleAuthKey must be empty or a valid key with no newlines; aborted.")
+        ts_host = str(values.get("TailscaleHostname", "mihomo")).strip()
+        if not ts_host or is_placeholder(ts_host) or re.search(r"[\s'\"]", ts_host):
+            raise ValueError("TailscaleHostname must be a non-empty hostname without whitespace or quotes; aborted.")
+        for bkey in ("TailscaleEphemeral", "TailscaleAcceptRoutes"):
+            if not isinstance(values.get(bkey), bool):
+                raise ValueError(f"{bkey} must be a boolean; aborted.")
+
 
 def yaml_scalar(value):
+    if isinstance(value, bool):
+        return "true" if value else "false"
     if isinstance(value, int):
         return str(value)
     return "'" + str(value).replace("'", "''") + "'"
@@ -176,13 +201,20 @@ def set_yaml_field(block, field, spaces, value):
     return re.sub(pattern, lambda m: m.group(1) + yaml_scalar(value), block, count=1)
 
 
-def set_yaml_proxy(text, name, fields):
+def remove_yaml_field(block, field, spaces):
+    pattern = rf'(?m)^{" " * spaces}{re.escape(field)}:[ \t]*[^\r\n]*\r?\n?'
+    return re.sub(pattern, "", block, count=1)
+
+
+def set_yaml_proxy(text, name, fields, remove_fields=()):
     pattern = rf'(?ms)^(  - name: {re.escape(name)}[^\r\n]*\r?\n)(.*?)(?=^  - name: |^[^\s#]|\Z)'
     if len(list(re.finditer(pattern, text))) != 1:
         raise ValueError(f"Cannot uniquely locate Mihomo proxy {name}; aborted.")
 
     def repl(m):
         header, block = m.group(1), m.group(2)
+        for field, spaces in remove_fields:
+            block = remove_yaml_field(block, field, spaces)
         for field, (spaces, val) in fields.items():
             block = set_yaml_field(block, field, spaces, val)
         return header + block
@@ -215,6 +247,24 @@ def render_client_yaml(content):
         "max-early-data": (6, int(CONFIG["WsMaxEarlyData"])),
         "early-data-header-name": (6, CONFIG["WsEarlyDataHeader"]),
     })
+    if re.search(r'(?m)^  - name:[ \t]*Tailscale[ \t]*\r?$', text):
+        ts_fields = {
+            "hostname": (4, str(CONFIG["TailscaleHostname"]).strip() or "mihomo"),
+            "ephemeral": (4, bool(CONFIG["TailscaleEphemeral"])),
+            "accept-routes": (4, bool(CONFIG["TailscaleAcceptRoutes"])),
+        }
+        ts_remove = []
+        ts_url = str(CONFIG.get("TailscaleControlUrl", "")).strip()
+        if ts_url:
+            ts_fields["control-url"] = (4, ts_url)
+        else:
+            ts_remove.append(("control-url", 4))
+        ts_key = str(CONFIG.get("TailscaleAuthKey", "")).strip()
+        if ts_key:
+            ts_fields["auth-key"] = (4, ts_key)
+        else:
+            ts_remove.append(("auth-key", 4))
+        text = set_yaml_proxy(text, "Tailscale", ts_fields, remove_fields=ts_remove)
     return set_yaml_field(text, "secret", 0, CONFIG["MihomoApiSecret"])
 
 
