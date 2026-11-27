@@ -12,3 +12,7 @@
 
 DOMAIN-SUFFIX,dns.google
 DOMAIN-SUFFIX,cloudflare-dns.com
+
+# Official Tailscale control-plane, web console & DERP TCP (UDP P2P/STUN stays Direct via tailscale.list)
+DOMAIN-SUFFIX,tailscale.com
+DOMAIN-SUFFIX,tailscale.io

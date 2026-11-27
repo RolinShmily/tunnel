@@ -42,6 +42,7 @@
     "TailscaleControlUrl": "",
     "TailscaleAuthKey": "",
     "TailscaleHostname": "mihomo",
+    "TailscaleDialerProxy": "",
     "TailscaleEphemeral": false,
     "TailscaleAcceptRoutes": true
   }

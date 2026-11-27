@@ -76,6 +76,7 @@ CONFIG = {
     "TailscaleControlUrl": "",
     "TailscaleAuthKey": "",
     "TailscaleHostname": "mihomo",
+    "TailscaleDialerProxy": "",
     "TailscaleEphemeral": False,
     "TailscaleAcceptRoutes": True,
 }
@@ -202,6 +203,10 @@ def assert_values(values, need_client, need_server):
         ts_host = str(values.get("TailscaleHostname", "mihomo")).strip()
         if not ts_host or is_placeholder(ts_host) or re.search(r"[\s'\"]", ts_host):
             raise ValueError("TailscaleHostname must be a non-empty hostname without whitespace or quotes; aborted.")
+        ts_dialer = str(values.get("TailscaleDialerProxy", "")).strip()
+        if ts_dialer:
+            if is_placeholder(ts_dialer) or re.search(r"[\r\n'\"]", ts_dialer):
+                raise ValueError("TailscaleDialerProxy must be empty or a valid proxy/group name without newlines or quotes; aborted.")
         for bkey in ("TailscaleEphemeral", "TailscaleAcceptRoutes", "EnableAdBlock", "EnableExternalSubscribes"):
             if not isinstance(values.get(bkey), bool):
                 raise ValueError(f"{bkey} must be a boolean; aborted.")
@@ -528,6 +533,11 @@ def render_client_yaml(content, src_path):
             ts_fields["auth-key"] = (4, ts_key)
         else:
             ts_remove.append(("auth-key", 4))
+        ts_dialer = str(CONFIG.get("TailscaleDialerProxy", "")).strip()
+        if ts_dialer:
+            ts_fields["dialer-proxy"] = (4, ts_dialer)
+        else:
+            ts_remove.append(("dialer-proxy", 4))
         text = set_yaml_proxy(text, "Tailscale", ts_fields, remove_fields=ts_remove)
     text = set_yaml_field(text, "secret", 0, CONFIG["MihomoApiSecret"])
     text = apply_headscale(text)

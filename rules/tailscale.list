@@ -1,10 +1,15 @@
-PROCESS-NAME,tailscaled.exe
-PROCESS-NAME,tailscaled
-PROCESS-NAME,tailscale.exe
-PROCESS-NAME,tailscale
-DOMAIN-SUFFIX,tailscale.com
-DOMAIN-SUFFIX,tailscale.io
-DOMAIN-SUFFIX,ts.net
+# Tailscale data-plane (Tailnet + MagicDNS) & UDP P2P/STUN direct bypass
+# Official control-plane / web / DERP TCP (tailscale.com, tailscale.io) go via rules/proxy.list
+
 IP-CIDR,100.64.0.0/10,no-resolve
 IP-CIDR6,fd7a:115c:a1e0::/48,no-resolve
-DST-PORT,41641
+DOMAIN-SUFFIX,ts.net
+
+AND,((NETWORK,udp),(PROCESS-NAME,tailscaled.exe))
+AND,((NETWORK,udp),(PROCESS-NAME,tailscaled))
+AND,((NETWORK,udp),(PROCESS-NAME,tailscale.exe))
+AND,((NETWORK,udp),(PROCESS-NAME,tailscale))
+AND,((NETWORK,udp),(PROCESS-NAME,IPNExtension))
+AND,((NETWORK,udp),(SRC-PORT,41641))
+AND,((NETWORK,udp),(DST-PORT,41641))
+AND,((NETWORK,udp),(DST-PORT,3478),(DOMAIN-SUFFIX,tailscale.com))
