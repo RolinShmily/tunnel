@@ -10,7 +10,8 @@ Usage:
     python scripts/config-batch.py --preview
     python scripts/config-batch.py
     python scripts/config-batch.py --only client
-    python scripts/config-batch.py --only server
+    python scripts/config-batch.py -t client/mihomo-clash.yaml
+    python scripts/config-batch.py -t client/mihomo-clash-router.yaml -t server/sing-box.json
     python scripts/config-batch.py --in-place
 """
 
@@ -100,11 +101,11 @@ def load_local_config(repo_root, explicit_path=None):
     return None
 
 
-def assert_values(values, scope):
+def assert_values(values, need_client, need_server):
     required = set()
-    if scope in ("all", "client"):
+    if need_client:
         required |= CLIENT_REQUIRED
-    if scope in ("all", "server"):
+    if need_server:
         required |= SERVER_REQUIRED
 
     for key in sorted(required):
@@ -122,11 +123,11 @@ def assert_values(values, scope):
             except Exception as exc:
                 raise ValueError(f"{key} must be a valid UUID; aborted.") from exc
 
-    if not re.fullmatch(r"^(?:[0-9a-fA-F]{2}){1,8}$", str(values["ShortId"]).strip()):
+    if "ShortId" in required and not re.fullmatch(r"^(?:[0-9a-fA-F]{2}){1,8}$", str(values["ShortId"]).strip()):
         raise ValueError("ShortId must be 2-16 even-length hex chars; aborted.")
 
     port_keys = ["RealityPort", "Hy2Port", "WsPort"]
-    if scope in ("all", "server"):
+    if need_server:
         port_keys.append("HandshakePort")
     for key in port_keys:
         try:
@@ -315,14 +316,96 @@ def atomic_write(path, text):
                 pass
 
 
+def classify_file(path, content):
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".yaml":
+        if (re.search(r'(?m)^proxies:[ \t]*\r?$', content) and
+                re.search(r'(?m)^  - name:[ \t]*(?:Reality|Hysteria2)[ \t]*\r?$', content)):
+            return "client_yaml"
+    elif ext == ".json":
+        if re.search(r'"tag"\s*:\s*"[^"]*(?:reality-in|hysteria-in)"', content, re.IGNORECASE):
+            return "server_json"
+    elif ext == ".txt":
+        if os.path.basename(path).lower() == "v2ray-nodes.txt" or (
+                "vless://" in content and "hysteria2://" in content):
+            return "client_nodes"
+    return None
+
+
+def resolve_target_path(raw_path, repo_root):
+    if os.path.isabs(raw_path):
+        return os.path.abspath(raw_path)
+    cwd_candidate = os.path.abspath(raw_path)
+    if os.path.exists(cwd_candidate):
+        return cwd_candidate
+    return os.path.abspath(os.path.join(repo_root, raw_path))
+
+
+def collect_jobs(repo_root, scope, targets):
+    jobs = {}
+    if targets:
+        for raw in targets:
+            resolved = resolve_target_path(raw, repo_root)
+            if os.path.isfile(resolved):
+                with open(resolved, "r", encoding="utf-8") as f:
+                    content = f.read()
+                kind = classify_file(resolved, content)
+                if not kind:
+                    raise ValueError(f"Unsupported config template: {resolved}; aborted.")
+                jobs[resolved] = (kind, content)
+            elif os.path.isdir(resolved):
+                for path in walk_files(resolved, {".yaml", ".json", ".txt"}):
+                    with open(path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    kind = classify_file(path, content)
+                    if kind:
+                        jobs[path] = (kind, content)
+            else:
+                raise ValueError(f"Target path not found: {raw}; aborted.")
+        return jobs
+
+    if scope in ("all", "client"):
+        for path in walk_files(os.path.join(repo_root, "client"), {".yaml", ".txt"}):
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+            kind = classify_file(path, content)
+            if kind in ("client_yaml", "client_nodes"):
+                jobs[path] = (kind, content)
+
+    if scope in ("all", "server"):
+        for path in walk_files(os.path.join(repo_root, "server"), {".json"}):
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+            kind = classify_file(path, content)
+            if kind == "server_json":
+                jobs[path] = (kind, content)
+
+    return jobs
+
+
+def resolve_output_path(src_path, repo_root, out_base, in_place):
+    if in_place:
+        return src_path
+    repo_abs = os.path.abspath(repo_root)
+    src_abs = os.path.abspath(src_path)
+    try:
+        common = os.path.commonpath([repo_abs, src_abs])
+    except ValueError:
+        common = ""
+    if common == repo_abs:
+        return os.path.join(out_base, os.path.relpath(src_abs, repo_abs))
+    return os.path.join(out_base, os.path.basename(src_abs))
+
+
 def parse_args():
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     parser = argparse.ArgumentParser(
         description="Batch-replace required placeholders in client/ and server/ config templates."
     )
-    parser.add_argument("--only", choices=("all", "client", "server"), default="all", help="Target scope (default: all)")
+    parser.add_argument("--only", choices=("all", "client", "server"), default="all", help="Target scope when -t is not set (default: all)")
+    parser.add_argument("-t", "--target", action="append", default=[], help="Specific template file or directory to render (repeatable)")
     parser.add_argument("-o", "--output", default=os.path.join(repo_root, "dist"), help="Output directory (default: <repo>/dist)")
-    parser.add_argument("--in-place", action="store_true", help="Overwrite templates in client/ and server/ directly")
+    parser.add_argument("--in-place", action="store_true", help="Overwrite target files directly instead of writing to dist/")
     parser.add_argument("-l", "--local-config", default=None, help="Optional local JSON override file (default: config.local.json)")
     parser.add_argument("-p", "--preview", action="store_true", help="Dry-run scan without writing files")
     return parser.parse_args()
@@ -332,51 +415,44 @@ def main():
     args = parse_args()
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     loaded = load_local_config(repo_root, args.local_config)
-    assert_values(CONFIG, args.only)
+
+    jobs = collect_jobs(repo_root, args.only, args.target)
+    if not jobs:
+        raise ValueError("No matching config templates found; aborted.")
+
+    need_client = any(kind in ("client_yaml", "client_nodes") for kind, _ in jobs.values())
+    need_server = any(kind == "server_json" for kind, _ in jobs.values())
+    assert_values(CONFIG, need_client, need_server)
     if loaded:
         print(f"Loaded local config: {os.path.abspath(loaded)}")
 
     rendered = {}
-
-    if args.only in ("all", "client"):
-        client_dir = os.path.join(repo_root, "client")
-        for path in walk_files(client_dir, {".yaml"}):
-            with open(path, "r", encoding="utf-8") as f:
-                content = f.read()
-            if (re.search(r'(?m)^proxies:[ \t]*\r?$', content) and
-                    re.search(r'(?m)^  - name:[ \t]*(?:Reality|Hysteria2)[ \t]*\r?$', content)):
-                rendered[os.path.relpath(path, repo_root)] = render_client_yaml(content)
-        nodes_path = os.path.join(client_dir, "v2ray-nodes.txt")
-        if os.path.isfile(nodes_path):
-            rendered[os.path.relpath(nodes_path, repo_root)] = render_v2ray_nodes()
-
-    if args.only in ("all", "server"):
-        server_dir = os.path.join(repo_root, "server")
-        for path in walk_files(server_dir, {".json"}):
-            with open(path, "r", encoding="utf-8") as f:
-                content = f.read()
-            if re.search(r'"tag"\s*:\s*"[^"]*(?:reality-in|hysteria-in)"', content, re.IGNORECASE):
-                rendered[os.path.relpath(path, repo_root)] = render_server_json(content)
-
-    if not rendered:
-        raise ValueError("No matching config templates found; aborted.")
-
-    for rel, text in rendered.items():
+    out_base = os.path.abspath(args.output)
+    for src_path in sorted(jobs):
+        kind, content = jobs[src_path]
+        if kind == "client_yaml":
+            text = render_client_yaml(content)
+        elif kind == "client_nodes":
+            text = render_v2ray_nodes()
+        else:
+            text = render_server_json(content)
         if PLACEHOLDER_RE.search(text):
-            raise ValueError(f"Unresolved placeholder found in {rel}; aborted.")
+            raise ValueError(f"Unresolved placeholder found in {src_path}; aborted.")
+        dst_path = resolve_output_path(src_path, repo_root, out_base, args.in_place)
+        rendered[dst_path] = text
 
-    out_base = repo_root if args.in_place else os.path.abspath(args.output)
+    scope_desc = "target" if args.target else args.only
     if args.preview:
-        print(f"Preview ({args.only}): {len(rendered)} files -> {out_base}")
-        for rel in sorted(rendered):
-            print(os.path.join(out_base, rel))
+        print(f"Preview ({scope_desc}): {len(rendered)} files")
+        for dst_path in sorted(rendered):
+            print(dst_path)
         return
 
-    for rel in sorted(rendered):
-        atomic_write(os.path.join(out_base, rel), rendered[rel])
+    for dst_path in sorted(rendered):
+        atomic_write(dst_path, rendered[dst_path])
 
     mode = "in-place" if args.in_place else out_base
-    print(f"Rendered {len(rendered)} files ({args.only}) -> {mode}.")
+    print(f"Rendered {len(rendered)} files ({scope_desc}) -> {mode}.")
 
 
 if __name__ == "__main__":
