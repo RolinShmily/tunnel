@@ -21,4 +21,4 @@
 - **代理组**：精简为 `Proxy`（手动选择）+ `Auto`（fallback 自动切换：`Reality` → `Hysteria2` → `CF-CDN` → `Direct`）+ `Direct`，不拆分多服务分组。
 - **双栈 vs `-v4only`**：`-v4only` 关闭 `ipv6` 与 `dns.ipv6`，并在私网/Tailscale 规则之后通过 `IP-CIDR6,::/0,REJECT,no-resolve` 快速拒绝公网 IPv6，避免无 IPv6 环境下直连报错或卡顿。
 - **DNS 与分流**：FakeIP 模式 + `prefer-h3: true`，按 `nameserver-policy` 分流国内/海外解析；非 CN 域名拦截 `UDP 443`（QUIC 回退 HTTP/2）；全量采用 `.mrs` 二进制 `rule-providers`。
-- **双 TUN 与单 TUN 边界**：前 6 份模板在 `tun.route-exclude-address` 排除 Tailscale 网段并走 `RULE-SET,tailscale,Direct`，适配系统独立 Tailscale 客户端；后 2 份 `*-tailscale*.yaml` 用于单 VPN 槽位设备（如手机），由 Mihomo 直接承接 Tailnet 流量与 `100.100.100.100#Tailscale` 解析。
+- **双 TUN 与单 TUN 边界**：前 6 份模板在 `tun.route-exclude-address` 排除 Tailscale 网段并走 `RULE-SET,tailscale,Direct`，适配系统独立 Tailscale 客户端；后 2 份 `*-tailscale*.yaml` 用于单 VPN 槽位设备（如手机），由 Mihomo 直接承接 Tailnet 流量与 `ts://Tailscale` 解析。

@@ -318,7 +318,7 @@ def apply_headscale(text):
         return text
 
     ts_outbound = has_tailscale_outbound(text)
-    magic_dns_server = "100.100.100.100#Tailscale" if ts_outbound else "100.100.100.100"
+    magic_dns_server = "ts://Tailscale" if ts_outbound else "100.100.100.100"
     magic_dns_target = "Tailscale" if ts_outbound else "Direct"
 
     policy_lines = ["    # headscale:start"]

@@ -138,7 +138,7 @@ dns:
   direct-nameserver-follow-policy: true
   nameserver-policy:
     '+.ts.net':
-      - 100.100.100.100#Tailscale
+      - ts://Tailscale
     'gh-proxy.com,+.gh-proxy.com':
       - https://dns.alidns.com/dns-query#disable-qtype-65=true
       - https://doh.pub/dns-query#disable-qtype-65=true

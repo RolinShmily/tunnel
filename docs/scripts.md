@@ -23,7 +23,7 @@
 - **产物清单**：渲染包含客户端文件且非 `--in-place` 时，自动生成 `dist/client/url`（无扩展名，每行一个已渲染的客户端文件名）。
 - **Tailscale 出站字段**：`TailscaleControlUrl` / `TailscaleAuthKey` / `TailscaleHostname` 等仅作用于 `client/mihomo-clash-tailscale*.yaml`；`TailscaleControlUrl` 或 `TailscaleAuthKey` 留空 `""` 时自动删除对应字段（分别回退官方 Tailscale 控制面 / 日志交互登录）。
 - **客户端可选叠加层（幂等）**：
-  - **Headscale**（`HeadscaleServer`、`HeadscaleMagicDnsDomain`）：注入控制面 DNS/FakeIP 绕过与直连规则；MagicDNS 根据目标模板是否含 `type: tailscale` 自动指向 `100.100.100.100`（`Direct`）或 `100.100.100.100#Tailscale`（`Tailscale`）。
+  - **Headscale**（`HeadscaleServer`、`HeadscaleMagicDnsDomain`）：注入控制面 DNS/FakeIP 绕过与直连规则；MagicDNS 根据目标模板是否含 `type: tailscale` 自动指向 `100.100.100.100`（`Direct`）或 `ts://Tailscale`（`Tailscale`）。
   - **AdBlock**（`EnableAdBlock`、`AdBlockRuleUrl`）：在 `custom_direct` 后插入 `RULE-SET,adblock,REJECT` 及对应 `rule-provider`，不新增策略组。
   - **外部订阅**（`EnableExternalSubscribes`、`ExternalSubscribes`）：注入 `proxy-providers` 并挂载到 `Proxy` 组的 `use:`。
   - **镜像前缀**（`RuleSetProxy`）：仅对 `external-ui-url` 与 `rule-providers` 中的 GitHub URL 拼接镜像前缀（非 GitHub 源保持原样），留空 `""` 则全部直连。
