@@ -18,5 +18,11 @@ DOMAIN,steamcdn-a.akamaihd.net
 DOMAIN-SUFFIX,cm.steampowered.com
 DOMAIN-SUFFIX,steamserver.net
 
+# CS2 & TGPRO community servers direct
+PROCESS-NAME,cs2.exe
+DOMAIN-SUFFIX,tgpro.top
+DOMAIN-SUFFIX,tgpro.net
+DOMAIN-SUFFIX,tgprocs.net
+
 # Google Play CN download CDN fix
 DOMAIN,services.googleapis.cn

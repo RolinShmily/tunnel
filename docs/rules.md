@@ -7,7 +7,7 @@
 | 文件 | 对应 Provider | 作用 |
 | --- | --- | --- |
 | `tailscale.list` | `tailscale` | 规避 Tailscale 客户端与控制面：含 `tailscaled` / `tailscale` 进程名、`tailscale.com` / `tailscale.io` / `ts.net` 域名、`100.64.0.0/10`、`fd7a:115c:a1e0::/48` 及 UDP `41641`。同时挂载于 `dns.fake-ip-filter`（仅提取其中域名项），防止控制面解析落入 FakeIP |
-| `direct.list` | `custom_direct` | 自定义直连白名单，内置 `.local`、`172.32.0.0/12`、Steam 国内 CDN/CM 修复（`steamcdn-a.akamaihd.net`、`cm.steampowered.com`、`steamserver.net`）及 Google Play 国行下载修复（`services.googleapis.cn`）。优先级高于去广告与代理规则 |
+| `direct.list` | `custom_direct` | 自定义直连白名单，内置 `.local`、`172.32.0.0/12`、Steam 国内 CDN/CM 修复（`steamcdn-a.akamaihd.net`、`cm.steampowered.com`、`steamserver.net`）、CS2 与 TGPRO 社区服直连（`cs2.exe`、`tgpro.top`、`tgpro.net`、`tgprocs.net`）及 Google Play 国行下载修复（`services.googleapis.cn`）。优先级高于去广告与代理规则，同时挂载于国内 `dns.nameserver-policy` 与 `dns.fake-ip-filter`（仅提取其中域名项），避免自定义直连域名落入 FakeIP |
 | `proxy.list` | `custom_proxy` | 自定义代理白名单，强制指定域名或 IP 走 `Proxy`（默认含 `dns.google`、`cloudflare-dns.com`） |
 
 ## 维护说明

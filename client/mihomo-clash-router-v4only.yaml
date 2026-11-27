@@ -146,7 +146,7 @@ dns:
     'gh-proxy.com,+.gh-proxy.com':
       - https://dns.alidns.com/dns-query#disable-qtype-65=true
       - https://doh.pub/dns-query#disable-qtype-65=true
-    rule-set:cn_domain,private_domain,fakeipfilter_cn,steamcn_domain,microsoftcn_domain,applecn_domain:
+    rule-set:custom_direct,cn_domain,private_domain,fakeipfilter_cn,steamcn_domain,microsoftcn_domain,applecn_domain:
       - https://dns.alidns.com/dns-query#disable-qtype-65=true
       - https://doh.pub/dns-query#disable-qtype-65=true
     rule-set:fakeipfilter_!cn:
@@ -155,6 +155,7 @@ dns:
     - https://8.8.8.8/dns-query#Proxy&ecs=223.5.5.0/24
   fake-ip-filter:
     - rule-set:tailscale
+    - rule-set:custom_direct
     - rule-set:fakeipfilter_cn
     - rule-set:fakeipfilter_!cn
     - rule-set:private_domain
