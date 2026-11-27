@@ -1,0 +1,35 @@
+{
+  "config-batch": {
+    "NodeAddress": "<node-address>",
+    "RealityPort": 443,
+    "Uuid": "<uuid>",
+    "RealitySni": "<reality-sni>",
+    "RealityPublicKey": "<reality-public-key>",
+    "RealityPrivateKey": "<reality-private-key>",
+    "ShortId": "<reality-short-id>",
+    "HandshakeHost": "<reality-host>",
+    "HandshakePort": 443,
+    "Hy2Port": 27015,
+    "Hy2Sni": "<hy2-sni>",
+    "Hy2Password": "<hy2-password>",
+    "CertificatePath": "<cert-path>",
+    "KeyPath": "<key-path>",
+    "WsOptimizedDomain": "<cf-domain>",
+    "WsPort": 8443,
+    "WsSni": "<ws-sni>",
+    "WsUuid": "<ws-uuid>",
+    "WsPath": "<ws-path>",
+    "WsCertificatePath": "<ws-cert-path>",
+    "WsKeyPath": "<ws-key-path>",
+    "WsMaxEarlyData": 2048,
+    "WsEarlyDataHeader": "Sec-WebSocket-Protocol",
+    "MihomoApiSecret": "<api-secret>"
+  },
+  "feature-generate": {
+    "HeadscaleServer": "",
+    "HeadscaleMagicDnsDomain": "",
+    "ExternalSubscribes": [],
+    "EnableExternalSubscribes": false,
+    "RuleSetProxy": "https://gh-proxy.com/"
+  }
+}

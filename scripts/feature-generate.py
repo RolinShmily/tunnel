@@ -24,7 +24,7 @@ import uuid
 IGNORED_DIRS = {"__pycache__", ".git"}
 PLACEHOLDER_RE = re.compile(r"<[a-z0-9-]+>")
 
-# Local overrides can be placed in features.local.json or config.local.json (gitignored).
+# Default schema; fill values in <repo>/config.json (copy from config.json.example).
 FEATURES = {
     # Headscale (leave empty to remove/skip)
     "HeadscaleServer": "",
@@ -43,28 +43,27 @@ def is_placeholder(val):
     return bool(PLACEHOLDER_RE.fullmatch(str(val).strip()))
 
 
-def load_local_features(repo_root, explicit_path=None):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    candidates = [explicit_path] if explicit_path else [
-        os.path.join(repo_root, "features.local.json"),
-        os.path.join(script_dir, "features.local.json"),
-        os.path.join(repo_root, "config.local.json"),
-        os.path.join(script_dir, "config.local.json"),
-    ]
-    for path in candidates:
-        if path and os.path.isfile(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except (OSError, json.JSONDecodeError) as exc:
-                raise ValueError(f"Failed to load local features ({path}): {exc}") from exc
-            if not isinstance(data, dict):
-                raise ValueError(f"Local features file must be a JSON object: {path}")
-            for key, val in data.items():
-                if key in FEATURES:
-                    FEATURES[key] = val
-            return path
-    return None
+def load_features(repo_root, explicit_path=None):
+    path = os.path.abspath(explicit_path) if explicit_path else os.path.join(repo_root, "config.json")
+    if not os.path.isfile(path):
+        raise ValueError(
+            f"Config file not found: {path} "
+            f"(copy config.json.example to config.json and fill in your values); aborted."
+        )
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Failed to load config ({path}): {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"Config file must be a JSON object: {path}")
+    section = data.get("feature-generate")
+    if not isinstance(section, dict):
+        raise ValueError(f"Missing or invalid 'feature-generate' section in {path}; aborted.")
+    for key, val in section.items():
+        if key in FEATURES:
+            FEATURES[key] = val
+    return path
 
 
 def assert_features(values):
@@ -275,7 +274,7 @@ def parse_args():
         description="Apply optional feature overlays (Headscale, proxy-providers, ruleset proxy) to Mihomo YAML configs."
     )
     parser.add_argument("-t", "--target", default=default_target, help="Target YAML file or directory (default: dist/client if present, else client/)")
-    parser.add_argument("-l", "--local-config", default=None, help="Optional local JSON override file (default: features.local.json or config.local.json)")
+    parser.add_argument("-c", "--config", default=None, help="Config JSON file (default: <repo>/config.json)")
     parser.add_argument("-p", "--preview", action="store_true", help="Dry-run scan without writing files")
     return parser.parse_args()
 
@@ -283,10 +282,9 @@ def parse_args():
 def main():
     args = parse_args()
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    loaded = load_local_features(repo_root, args.local_config)
+    loaded = load_features(repo_root, args.config)
     assert_features(FEATURES)
-    if loaded:
-        print(f"Loaded local features: {os.path.abspath(loaded)}")
+    print(f"Loaded config: {os.path.abspath(loaded)}")
 
     files = collect_targets(os.path.abspath(args.target))
     updates = {}

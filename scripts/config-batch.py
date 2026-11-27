@@ -4,7 +4,9 @@
 Batch-replace required <placeholder> markers across client/ and server/ templates.
 
 Outputs rendered configs to dist/ by default (gitignored), leaving tracked
-templates untouched. Optional feature additions live in scripts/feature-generate.py.
+templates untouched. When rendering client templates to an output directory,
+also writes `<output>/url` with one rendered client filename per line.
+Optional feature additions live in scripts/feature-generate.py.
 
 Usage:
     python scripts/config-batch.py --preview
@@ -26,7 +28,7 @@ import uuid
 IGNORED_DIRS = {"__pycache__", ".git"}
 PLACEHOLDER_RE = re.compile(r"<[a-z0-9-]+>")
 
-# Local overrides can be placed in config.local.json (gitignored).
+# Default schema; fill values in <repo>/config.json (copy from config.json.example).
 CONFIG = {
     # Reality
     "NodeAddress": "<node-address>",
@@ -79,26 +81,27 @@ def is_placeholder(val):
     return bool(PLACEHOLDER_RE.fullmatch(str(val).strip()))
 
 
-def load_local_config(repo_root, explicit_path=None):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    candidates = [explicit_path] if explicit_path else [
-        os.path.join(repo_root, "config.local.json"),
-        os.path.join(script_dir, "config.local.json"),
-    ]
-    for path in candidates:
-        if path and os.path.isfile(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except (OSError, json.JSONDecodeError) as exc:
-                raise ValueError(f"Failed to load local config ({path}): {exc}") from exc
-            if not isinstance(data, dict):
-                raise ValueError(f"Local config must be a JSON object: {path}")
-            for key, val in data.items():
-                if key in CONFIG:
-                    CONFIG[key] = val
-            return path
-    return None
+def load_config(repo_root, explicit_path=None):
+    path = os.path.abspath(explicit_path) if explicit_path else os.path.join(repo_root, "config.json")
+    if not os.path.isfile(path):
+        raise ValueError(
+            f"Config file not found: {path} "
+            f"(copy config.json.example to config.json and fill in your values); aborted."
+        )
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Failed to load config ({path}): {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"Config file must be a JSON object: {path}")
+    section = data.get("config-batch")
+    if not isinstance(section, dict):
+        raise ValueError(f"Missing or invalid 'config-batch' section in {path}; aborted.")
+    for key, val in section.items():
+        if key in CONFIG:
+            CONFIG[key] = val
+    return path
 
 
 def assert_values(values, need_client, need_server):
@@ -241,6 +244,10 @@ def render_v2ray_nodes():
             f"&path={ws_path}&fp=chrome#CF-CDN"
         ),
     ])
+
+
+def render_client_url_list(client_files):
+    return "\n".join(sorted(set(client_files)))
 
 
 def pick_one_inbound(inbounds, proto, tag_hint):
@@ -406,7 +413,7 @@ def parse_args():
     parser.add_argument("-t", "--target", action="append", default=[], help="Specific template file or directory to render (repeatable)")
     parser.add_argument("-o", "--output", default=os.path.join(repo_root, "dist"), help="Output directory (default: <repo>/dist)")
     parser.add_argument("--in-place", action="store_true", help="Overwrite target files directly instead of writing to dist/")
-    parser.add_argument("-l", "--local-config", default=None, help="Optional local JSON override file (default: config.local.json)")
+    parser.add_argument("-c", "--config", default=None, help="Config JSON file (default: <repo>/config.json)")
     parser.add_argument("-p", "--preview", action="store_true", help="Dry-run scan without writing files")
     return parser.parse_args()
 
@@ -414,7 +421,7 @@ def parse_args():
 def main():
     args = parse_args()
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    loaded = load_local_config(repo_root, args.local_config)
+    loaded = load_config(repo_root, args.config)
 
     jobs = collect_jobs(repo_root, args.only, args.target)
     if not jobs:
@@ -423,10 +430,10 @@ def main():
     need_client = any(kind in ("client_yaml", "client_nodes") for kind, _ in jobs.values())
     need_server = any(kind == "server_json" for kind, _ in jobs.values())
     assert_values(CONFIG, need_client, need_server)
-    if loaded:
-        print(f"Loaded local config: {os.path.abspath(loaded)}")
+    print(f"Loaded config: {os.path.abspath(loaded)}")
 
     rendered = {}
+    client_files = []
     out_base = os.path.abspath(args.output)
     for src_path in sorted(jobs):
         kind, content = jobs[src_path]
@@ -440,6 +447,11 @@ def main():
             raise ValueError(f"Unresolved placeholder found in {src_path}; aborted.")
         dst_path = resolve_output_path(src_path, repo_root, out_base, args.in_place)
         rendered[dst_path] = text
+        if kind in ("client_yaml", "client_nodes"):
+            client_files.append(os.path.basename(dst_path))
+
+    if not args.in_place and client_files:
+        rendered[os.path.join(out_base, "url")] = render_client_url_list(client_files)
 
     scope_desc = "target" if args.target else args.only
     if args.preview:
