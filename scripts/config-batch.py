@@ -20,6 +20,7 @@ Usage:
 """
 
 import argparse
+import ipaddress
 import json
 import os
 import re
@@ -72,6 +73,7 @@ CONFIG = {
 
     # Tailscale / Headscale
     "HeadscaleServer": "",
+    "HeadscaleServerIps": [],
     "HeadscaleMagicDnsDomain": "",
     "TailscaleControlUrl": "",
     "TailscaleAuthKey": "",
@@ -214,6 +216,7 @@ def assert_values(values, need_client, need_server):
             val = str(values.get(key, "")).strip()
             if val and not is_placeholder(val) and re.search(r"[\s/:]", val):
                 raise ValueError(f"{key} must be a hostname or domain; aborted.")
+        parse_headscale_ips(values.get("HeadscaleServerIps", []))
         prefix = str(values.get("RuleSetProxy", "")).strip()
         if prefix and not is_placeholder(prefix):
             if not re.fullmatch(r"https?://[^\s]+/", prefix):
@@ -310,6 +313,30 @@ def has_tailscale_outbound(text):
     return bool(re.search(r'(?m)^    type:[ \t]*tailscale[ \t]*\r?$', text))
 
 
+def is_v4only_config(text):
+    return bool(re.search(r'(?m)^ipv6:[ \t]*false[ \t]*\r?$', text))
+
+
+def parse_headscale_ips(raw_ips):
+    if not isinstance(raw_ips, list):
+        raise ValueError("HeadscaleServerIps must be a list of IP addresses or CIDRs; aborted.")
+    networks = []
+    seen = set()
+    for item in raw_ips:
+        val = str(item).strip()
+        if not val or is_placeholder(val):
+            continue
+        try:
+            net = ipaddress.ip_network(val, strict=False)
+        except ValueError as exc:
+            raise ValueError(f"Invalid IP or CIDR in HeadscaleServerIps: {val}; aborted.") from exc
+        key = str(net)
+        if key not in seen:
+            seen.add(key)
+            networks.append(net)
+    return networks
+
+
 def apply_headscale(text):
     text = re.sub(r'(?ms)^[ \t]*# headscale:start\r?\n.*?^[ \t]*# headscale:end\r?\n', "", text)
 
@@ -319,58 +346,68 @@ def apply_headscale(text):
     hs_domain = str(CONFIG.get("HeadscaleMagicDnsDomain", "")).strip()
     if is_placeholder(hs_domain):
         hs_domain = ""
-    if not hs_server and not hs_domain:
+    hs_ips = parse_headscale_ips(CONFIG.get("HeadscaleServerIps", []))
+    if not hs_server and not hs_domain and not hs_ips:
         return text
 
     ts_outbound = has_tailscale_outbound(text)
+    v4only = is_v4only_config(text)
     magic_dns_server = "ts://Tailscale" if ts_outbound else "100.100.100.100"
     magic_dns_target = "Tailscale" if ts_outbound else "Direct"
 
-    policy_lines = ["    # headscale:start"]
-    if hs_server:
-        policy_lines.extend([
-            f"    '{hs_server},+.{hs_server}':",
-            "      - https://dns.alidns.com/dns-query#disable-qtype-65=true",
-            "      - https://doh.pub/dns-query#disable-qtype-65=true",
-        ])
-    if hs_domain:
-        policy_lines.extend([
-            f"    '+.{hs_domain}':",
-            f"      - {magic_dns_server}",
-        ])
-    policy_lines.append("    # headscale:end")
-    text = re.sub(
-        r'(?m)^(  nameserver-policy:[ \t]*\r?\n)',
-        lambda m: m.group(1) + "\n".join(policy_lines) + "\n",
-        text,
-        count=1,
-    )
+    if hs_server or hs_domain:
+        policy_lines = ["    # headscale:start"]
+        if hs_server:
+            policy_lines.extend([
+                f"    '{hs_server},+.{hs_server}':",
+                "      - https://dns.alidns.com/dns-query#disable-qtype-65=true",
+                "      - https://doh.pub/dns-query#disable-qtype-65=true",
+            ])
+        if hs_domain:
+            policy_lines.extend([
+                f"    '+.{hs_domain}':",
+                f"      - {magic_dns_server}",
+            ])
+        policy_lines.append("    # headscale:end")
+        text = re.sub(
+            r'(?m)^(  nameserver-policy:[ \t]*\r?\n)',
+            lambda m: m.group(1) + "\n".join(policy_lines) + "\n",
+            text,
+            count=1,
+        )
 
-    filter_lines = ["    # headscale:start"]
-    if hs_server:
-        filter_lines.extend([f"    - '{hs_server}'", f"    - '+.{hs_server}'"])
-    if hs_domain:
-        filter_lines.append(f"    - '+.{hs_domain}'")
-    filter_lines.append("    # headscale:end")
-    text = re.sub(
-        r'(?m)^(  fake-ip-filter:[ \t]*\r?\n)',
-        lambda m: m.group(1) + "\n".join(filter_lines) + "\n",
-        text,
-        count=1,
-    )
+        filter_lines = ["    # headscale:start"]
+        if hs_server:
+            filter_lines.extend([f"    - '{hs_server}'", f"    - '+.{hs_server}'"])
+        if hs_domain:
+            filter_lines.append(f"    - '+.{hs_domain}'")
+        filter_lines.append("    # headscale:end")
+        text = re.sub(
+            r'(?m)^(  fake-ip-filter:[ \t]*\r?\n)',
+            lambda m: m.group(1) + "\n".join(filter_lines) + "\n",
+            text,
+            count=1,
+        )
 
-    rule_lines = ["  # headscale:start"]
+    rule_items = []
     if hs_server:
-        rule_lines.append(f"  - DOMAIN-SUFFIX,{hs_server},Direct")
+        rule_items.append(f"  - DOMAIN-SUFFIX,{hs_server},Direct")
+    for net in hs_ips:
+        if net.version == 4:
+            rule_items.append(f"  - IP-CIDR,{net},Direct,no-resolve")
+        elif not v4only:
+            rule_items.append(f"  - IP-CIDR6,{net},Direct,no-resolve")
     if hs_domain:
-        rule_lines.append(f"  - DOMAIN-SUFFIX,{hs_domain},{magic_dns_target}")
-    rule_lines.append("  # headscale:end")
-    text = re.sub(
-        r'(?m)^(rules:[ \t]*\r?\n)',
-        lambda m: m.group(1) + "\n".join(rule_lines) + "\n",
-        text,
-        count=1,
-    )
+        rule_items.append(f"  - DOMAIN-SUFFIX,{hs_domain},{magic_dns_target}")
+
+    if rule_items:
+        rule_lines = ["  # headscale:start", *rule_items, "  # headscale:end"]
+        text = re.sub(
+            r'(?m)^(rules:[ \t]*\r?\n)',
+            lambda m: m.group(1) + "\n".join(rule_lines) + "\n",
+            text,
+            count=1,
+        )
     return text
 
 
@@ -789,7 +826,9 @@ def main():
 
     active = []
     if need_client:
-        if str(CONFIG.get("HeadscaleServer", "")).strip() or str(CONFIG.get("HeadscaleMagicDnsDomain", "")).strip():
+        if (str(CONFIG.get("HeadscaleServer", "")).strip() or
+                str(CONFIG.get("HeadscaleMagicDnsDomain", "")).strip() or
+                parse_headscale_ips(CONFIG.get("HeadscaleServerIps", []))):
             active.append("headscale")
         if CONFIG.get("EnableAdBlock"):
             active.append("adblock")

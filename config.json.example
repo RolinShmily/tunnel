@@ -38,6 +38,7 @@
   },
   "tailscale": {
     "HeadscaleServer": "",
+    "HeadscaleServerIps": [],
     "HeadscaleMagicDnsDomain": "",
     "TailscaleControlUrl": "",
     "TailscaleAuthKey": "",
